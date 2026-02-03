@@ -2,11 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  scroll-behavior: smooth;
+:root {
+  --paper: 248 246 242;   /* fondo papel */
+  --ink: 18 18 18;        /* texto */
+  --muted: 113 113 122;   /* gris */
+  --accent: 180 141 74;   /* dorado */
 }
 
 body {
   margin: 0;
-  background: white;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
 }
