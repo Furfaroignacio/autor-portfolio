@@ -6,6 +6,8 @@ import { Footer } from "./components/layout/Footer";
 import { HomePage } from "./pages/HomePage";
 import { BlogPage } from "./pages/BlogPage";
 import { PostPage } from "./pages/PostPage";
+import { AdminPage } from "./pages/AdminPage";
+
 
 export default function App() {
   return (
@@ -18,6 +20,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<PostPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>
         <Footer />
