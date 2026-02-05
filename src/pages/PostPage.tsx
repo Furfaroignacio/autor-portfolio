@@ -3,12 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Helmet } from "react-helmet-async";
 import { Container } from "../components/ui/Container";
-import { fetchPostBySlug} from "../lib/posts"
-import { type PostRow } from "../data/posts.api";
-
+import { fetchPostBySlug, type PostRow } from "../lib/posts";
 
 function stripFrontmatter(md: string) {
   return md.replace(/^---[\s\S]*?---\s*/m, "");
+}
+
+function safeDate(iso?: string | null) {
+  if (!iso) return "";
+  return String(iso).slice(0, 10);
 }
 
 export function PostPage() {
@@ -19,22 +22,30 @@ export function PostPage() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
+
     (async () => {
       try {
         setLoading(true);
         setErr(null);
+
         if (!slug) {
-          setPost(null);
+          if (alive) setPost(null);
           return;
         }
+
         const data = await fetchPostBySlug(slug);
-        setPost(data);
+        if (alive) setPost(data);
       } catch (e: any) {
-        setErr(e?.message ?? "Error cargando post");
+        if (alive) setErr(e?.message ?? "Error cargando post");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [slug]);
 
   const content = useMemo(() => {
@@ -74,10 +85,7 @@ export function PostPage() {
           </Helmet>
 
           <p className="text-neutral-700">Post no encontrado.</p>
-          <Link
-            to="/blog"
-            className="mt-4 inline-block underline underline-offset-4"
-          >
+          <Link to="/blog" className="mt-4 inline-block underline underline-offset-4">
             Volver al blog
           </Link>
         </Container>
@@ -89,7 +97,7 @@ export function PostPage() {
     <>
       <Helmet>
         <title>{post.title} — Guido Maria Furfaro</title>
-        <meta name="description" content={post.excerpt} />
+        <meta name="description" content={post.excerpt ?? ""} />
       </Helmet>
 
       <section className="py-16">
@@ -110,7 +118,7 @@ export function PostPage() {
             />
 
             <p className="mt-6 text-sm text-neutral-500">
-              {(post.published_at ?? post.updated_at).slice(0, 10)}
+              {safeDate(post.published_at ?? post.updated_at)}
             </p>
 
             <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">

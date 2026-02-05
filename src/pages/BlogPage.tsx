@@ -3,27 +3,47 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { Container } from "../components/ui/Container";
 import { SectionTitle } from "../components/ui/SectionTitle";
-import { fetchPublishedPosts } from "../lib/posts";
+import { fetchPublishedPosts, type PostListItem } from "../lib/posts";
 
-function categoryLabel(c: string) {
-  return c.toUpperCase();
+function categoryLabel(c?: string | null) {
+  return (c ?? "Blog").toUpperCase();
+}
+
+function safeDate(iso?: string | null) {
+  if (!iso) return "";
+  return String(iso).slice(0, 10);
 }
 
 export function BlogPage() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-  fetchPublishedPosts()
-    .then(setPosts)
-    .finally(() => setLoading(false));
-}, []);
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const data = await fetchPublishedPosts();
+        if (alive) setPosts(data);
+      } catch (e: any) {
+        if (alive) setErr(e?.message ?? "Error cargando posts");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const ordered = useMemo(() => {
     return posts.slice().sort((a, b) => {
-      const da = a.published_at ?? a.updated_at;
-      const db = b.published_at ?? b.updated_at;
+      const da = a.published_at ?? a.updated_at ?? "";
+      const db = b.published_at ?? b.updated_at ?? "";
       return da < db ? 1 : -1;
     });
   }, [posts]);
@@ -46,9 +66,20 @@ export function BlogPage() {
           />
 
           {loading && <p className="mt-6 text-black/60">Cargando…</p>}
-          {err && <p className="mt-6 text-red-700">{err}</p>}
 
-          {!loading && !err && (
+          {!loading && err && (
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+              {err}
+            </div>
+          )}
+
+          {!loading && !err && ordered.length === 0 && (
+            <div className="mt-6 rounded-2xl border border-black/10 bg-white/40 p-6 text-black/60">
+              Todavía no hay posts publicados.
+            </div>
+          )}
+
+          {!loading && !err && ordered.length > 0 && (
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {ordered.map((p) => (
                 <article
@@ -87,12 +118,12 @@ export function BlogPage() {
                     </h3>
 
                     <p className="mt-3 text-black/70 leading-relaxed">
-                      {p.excerpt}
+                      {p.excerpt ?? ""}
                     </p>
 
                     <div className="mt-5 flex items-center justify-between">
                       <p className="text-sm text-black/55">
-                        {(p.published_at ?? p.updated_at).slice(0, 10)}
+                        {safeDate(p.published_at ?? p.updated_at)}
                       </p>
 
                       <Link
