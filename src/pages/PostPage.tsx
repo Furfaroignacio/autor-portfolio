@@ -3,7 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Helmet } from "react-helmet-async";
 import { Container } from "../components/ui/Container";
-import { getPublishedPostBySlug, type PostRow } from "../data/posts.api";
+import { fetchPostBySlug} from "../lib/posts"
+import { type PostRow } from "../data/posts.api";
+
 
 function stripFrontmatter(md: string) {
   return md.replace(/^---[\s\S]*?---\s*/m, "");
@@ -25,7 +27,7 @@ export function PostPage() {
           setPost(null);
           return;
         }
-        const data = await getPublishedPostBySlug(slug);
+        const data = await fetchPostBySlug(slug);
         setPost(data);
       } catch (e: any) {
         setErr(e?.message ?? "Error cargando post");

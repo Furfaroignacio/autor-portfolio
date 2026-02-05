@@ -3,31 +3,22 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { Container } from "../components/ui/Container";
 import { SectionTitle } from "../components/ui/SectionTitle";
-import { getPublishedPosts, type PostRow } from "../data/posts.api";
+import { fetchPublishedPosts } from "../lib/posts";
 
 function categoryLabel(c: string) {
   return c.toUpperCase();
 }
 
 export function BlogPage() {
-  const [posts, setPosts] = useState<PostRow[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [err] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        const data = await getPublishedPosts();
-        setPosts(data);
-      } catch (e: any) {
-        setErr(e?.message ?? "Error cargando posts");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  fetchPublishedPosts()
+    .then(setPosts)
+    .finally(() => setLoading(false));
+}, []);
 
   const ordered = useMemo(() => {
     return posts.slice().sort((a, b) => {
