@@ -4,8 +4,6 @@ import { supabase } from "../lib/supabase";
 import { signInWithMagicLink, signInWithPassword, signOut } from "../auth/auth";
 import { AdminPosts } from "../sections/admin/AdminPosts";
 
-const AUTHOR_EMAIL = "furfaroignacio@gmail.com";
-
 export function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,44 +14,79 @@ export function AdminPage() {
   const [sendingMagic, setSendingMagic] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
+
+  // 1) Leer sesión + escuchar cambios
   useEffect(() => {
-  let mounted = true;
+    let mounted = true;
 
-  // sesión inicial
-  supabase.auth.getSession().then(({ data }) => {
-    if (!mounted) return;
-    setSessionEmail(data.session?.user?.email ?? null);
-  });
+    async function syncSession() {
+      const { data } = await supabase.auth.getUser();
+      if (!mounted) return;
+      setSessionEmail(data.user?.email ?? null);
+    }
 
-  // escuchar cambios (usa la session del evento)
-  const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-    setSessionEmail(session?.user?.email ?? null);
-  });
+    syncSession();
 
-  return () => {
-    mounted = false;
-    sub.subscription.unsubscribe();
-  };
-}, []);
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      syncSession();
+    });
 
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // 2) Chequear si el user logueado está en tabla "admins"
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAdmin() {
+      if (!sessionEmail) {
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        setCheckingAdmin(true);
+
+        // Si RLS está bien, esto solo devuelve data si el usuario existe en admins.
+        const { data, error } = await supabase
+          .from("admins")
+          .select("user_id")
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!cancelled) setIsAdmin(!!data);
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      } finally {
+        if (!cancelled) setCheckingAdmin(false);
+      }
+    }
+
+    checkAdmin();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionEmail]);
 
   const isAuthed = !!sessionEmail;
-  const isAuthor = sessionEmail === AUTHOR_EMAIL;
 
   async function handleLoginPassword() {
-  try {
-    setSigningIn(true);
-    setStatus("Iniciando sesión…");
-    await signInWithPassword(email.trim(), password);
-    await supabase.auth.getSession();
-    setStatus(null);
-  } catch (e: any) {
-    setStatus(e?.message ?? "Error al iniciar sesión con contraseña");
-  } finally {
-    setSigningIn(false);
+    try {
+      setSigningIn(true);
+      setStatus("Iniciando sesión…");
+      await signInWithPassword(email.trim(), password);
+      setStatus(null);
+    } catch (e: any) {
+      setStatus(e?.message ?? "Error al iniciar sesión con contraseña");
+    } finally {
+      setSigningIn(false);
+    }
   }
-}
-
 
   async function handleLoginMagic() {
     try {
@@ -72,6 +105,8 @@ export function AdminPage() {
     try {
       await signOut();
       setStatus(null);
+      setEmail("");
+      setPassword("");
     } catch (e: any) {
       setStatus(e?.message ?? "Error al cerrar sesión");
     }
@@ -81,7 +116,7 @@ export function AdminPage() {
     <section className="py-16">
       <Container>
         <h1 className="font-serif text-3xl">Admin</h1>
-        <p className="mt-2 text-neutral-600">Gestión del blog (solo autor).</p>
+        <p className="mt-2 text-neutral-600">Gestión del blog (solo admins).</p>
 
         <div className="mt-8 rounded-3xl border border-black/10 bg-white/60 p-6 shadow-sm">
           {!isAuthed ? (
@@ -126,9 +161,7 @@ export function AdminPage() {
                 </div>
               </div>
 
-              {status && (
-                <p className="mt-4 text-sm text-neutral-600">{status}</p>
-              )}
+              {status && <p className="mt-4 text-sm text-neutral-600">{status}</p>}
             </>
           ) : (
             <>
@@ -145,9 +178,11 @@ export function AdminPage() {
                 </button>
               </div>
 
-              {!isAuthor ? (
+              {checkingAdmin ? (
+                <p className="mt-4 text-sm text-neutral-600">Verificando permisos…</p>
+              ) : !isAdmin ? (
                 <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
-                  Esta cuenta no tiene permisos de autor.
+                  Esta cuenta no tiene permisos de admin.
                 </p>
               ) : (
                 <>
